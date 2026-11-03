@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PinCatch — Ambil aset Pinterest</title>
+  <meta name="description" content="Tempel link Pinterest, unduh gambar, GIF, atau video. Gambar bisa jadi PNG transparan tanpa background." />
+  <meta name="color-scheme" content="light dark" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='46' fill='%23d81b3c'/%3E%3Cpath d='M50 18a32 32 0 0 0-11 62c-1-5-2-12 0-17l7-28s-2-4-2-9c0-8 5-14 11-14 5 0 8 4 8 9 0 6-4 15-6 24-2 7 3 12 10 12 12 0 20-15 20-33 0-14-10-24-25-24-17 0-27 12-27 26 0 5 2 10 4 13l-8 30' fill='%23fff'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="style.css" />
+  <script>
+    // Set tema sebelum paint supaya tidak berkedip.
+    try {
+      const saved = localStorage.getItem("pincatch-theme");
+      const dark = saved ? saved === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+      if (dark) document.documentElement.dataset.theme = "dark";
+    } catch {}
+  </script>
+</head>
+<body>
+
+<!-- ikon -->
+<svg class="sprite" aria-hidden="true" focusable="false">
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></symbol>
+  <symbol id="i-sparkles" viewBox="0 0 24 24"><path d="m12 3 1.9 5.8L20 10l-6.1 1.2L12 17l-1.9-5.8L4 10l6.1-1.2Z"/><path d="M19 15l.7 2.1L22 18l-2.3.9L19 21l-.7-2.1L16 18l2.3-.9Z"/></symbol>
+  <symbol id="i-zap" viewBox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8Z"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></symbol>
+  <symbol id="i-left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+  <symbol id="i-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+  <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></symbol>
+  <symbol id="i-video" viewBox="0 0 24 24"><path d="m22 8-6 4 6 4V8Z"/><rect x="2" y="6" width="14" height="12" rx="2"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></symbol>
+  <symbol id="i-clipboard" viewBox="0 0 24 24"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></symbol>
+  <symbol id="i-compare" viewBox="0 0 24 24"><path d="M8 3 4 7l4 4M4 7h16M16 21l4-4-4-4M20 17H4"/></symbol>
+</svg>
+
+<header class="bar">
+  <div class="bar-in">
+    <a class="brand" href="/">
+      <span class="brand-mark" aria-hidden="true">P</span>
+      <span class="brand-name">Pin<em>Catch</em></span>
+    </a>
+
+    <div class="composer">
+      <label class="visually-hidden" for="url-input">Link Pinterest</label>
+      <textarea
+        id="url-input"
+        rows="1"
+        inputmode="url"
+        autocomplete="off"
+        spellcheck="false"
+        placeholder="Tempel link Pinterest, satu per baris"
+        aria-describedby="paste-hint"
+      ></textarea>
+      <div class="composer-tools">
+        <button type="button" id="paste-btn" class="icon-btn" aria-label="Tempel dari clipboard" title="Tempel dari clipboard">
+          <svg class="ic"><use href="#i-clipboard"/></svg>
+        </button>
+        <button type="button" id="clear-btn" class="icon-btn" aria-label="Kosongkan input" title="Kosongkan">
+          <svg class="ic"><use href="#i-x"/></svg>
+        </button>
+        <div class="seg" id="bg-mode" role="group" aria-label="Mode hapus background">
+          <button type="button" class="seg-btn is-on" data-mode="ai" aria-pressed="true">
+            <svg class="ic"><use href="#i-sparkles"/></svg><span>AI</span>
+          </button>
+          <button type="button" class="seg-btn" data-mode="quick" aria-pressed="false">
+            <svg class="ic"><use href="#i-zap"/></svg><span>Cepat</span>
+          </button>
+        </div>
+        <button type="button" id="fetch-btn" class="btn btn-primary">
+          Ambil<span class="kbd-hint">Ctrl + Enter</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="bar-actions">
+      <div class="seg" id="view-mode" role="group" aria-label="Tampilan hasil">
+        <button type="button" class="seg-btn is-on" data-view="queue" aria-pressed="true" title="Antrean">
+          <svg class="ic"><use href="#i-list"/></svg><span>Antrean</span>
+        </button>
+        <button type="button" class="seg-btn" data-view="grid" aria-pressed="false" title="Rak">
+          <svg class="ic"><use href="#i-grid"/></svg><span>Rak</span>
+        </button>
+      </div>
+      <button type="button" id="theme-btn" class="icon-btn" aria-label="Ganti tema terang/gelap" title="Tema">
+        <svg class="ic ic-sun"><use href="#i-sun"/></svg>
+        <svg class="ic ic-moon"><use href="#i-moon"/></svg>
+      </button>
+    </div>
+  </div>
+  <p id="paste-hint" class="visually-hidden">Bisa beberapa link sekaligus, maksimal 10. Link pin.it juga bisa.</p>
+</header>
+
+<main class="page">
+  <!-- daftar -->
+  <section id="view-list" aria-label="Hasil">
+    <div id="list-summary" class="summary" hidden></div>
+    <div id="list-body"></div>
+    <p id="empty-state" class="empty">
+      Belum ada aset.<br />
+      <small>Tempel link Pinterest di atas, lalu tekan Ambil.</small>
+    </p>
+  </section>
+
+  <!-- studio -->
+  <section id="view-studio" class="studio" hidden aria-label="Detail aset"></section>
+</main>
+
+<footer class="foot">
+  <p>Gunakan hanya untuk aset milikmu sendiri atau yang kamu punya izinnya.</p>
+</footer>
+
+<div id="toasts" class="toasts" role="status" aria-live="polite"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

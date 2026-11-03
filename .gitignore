@@ -1,0 +1,25 @@
+# dependencies
+node_modules/
+
+# vercel
+.vercel
+
+# secrets - JANGAN PERNAH di-commit
+.token
+.env
+.env.local
+*.key
+
+# helper lokal
+deploy.ps1
+.vercelignore
+
+# os
+.DS_Store
+Thumbs.db
+
+# log & backup
+*.log
+*.bak
+*.bak-*
+*.tmp
