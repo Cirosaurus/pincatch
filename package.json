@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Paste link Pinterest, dapatkan aset gambar/GIF/video, atau PNG transparan tanpa background.",
   "license": "MIT",
+  "scripts": {
+    "test": "node --test test/"
+  },
   "engines": {
     "node": ">=18.0.0"
   }

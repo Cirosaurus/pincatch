@@ -22,6 +22,7 @@ const EXT = { image: "jpg", gif: "gif", video: "mp4" };
 let bgMode = "ai";
 let view = "queue";
 let uidSeq = 1;
+let maxBatch = 10; // ditimpa /api/health; server yang menentukan
 const items = new Map(); // uid -> item
 let studioUid = null;
 
@@ -104,8 +105,11 @@ function parseUrls(text) {
   const out = [];
   const seen = new Set();
   for (const raw of String(text || "").split(/[\s\n]+/)) {
-    const s = raw.trim().replace(/^["'<]+|["'>.,]+$/g, "");
+    let s = raw.trim().replace(/^["'<]+|["'>.,]+$/g, "");
     if (!s || !URL_RE.test(s) || seen.has(s)) continue;
+    // Server butuh URL utuh; tempelan tanpa skema masih diterima regex.
+    if (/^(pin\.it\/|i\.pinimg\.com\/)/i.test(s)) s = "https://" + s;
+    s = s.replace(/^http:\/\/i\.pinimg\.com\//i, "https://i.pinimg.com/");
     seen.add(s);
     out.push(s);
   }
@@ -131,8 +135,8 @@ $("#clear-btn").addEventListener("click", () => {
 $("#fetch-btn").addEventListener("click", () => {
   const urls = parseUrls(urlInput.value);
   if (!urls.length) return toast("Belum ada link Pinterest yang valid.", true);
-  if (urls.length > 10) toast("Maksimal 10 link sekali proses — 10 pertama dipakai.");
-  resolveAll(urls.slice(0, 10));
+  if (urls.length > maxBatch) toast(`Maksimal ${maxBatch} link sekali proses — ${maxBatch} pertama dipakai.`);
+  resolveAll(urls.slice(0, maxBatch));
 });
 
 urlInput.addEventListener("keydown", (e) => {
@@ -184,7 +188,7 @@ async function resolveAll(urls) {
     items.set(uid, {
       uid, url: u, state: "loading",
       title: "", media: [], idx: 0,
-      removedBlob: null, originalShown: true,
+      removedBlob: null, removedIdx: null, originalShown: true,
       progress: null, error: "",
     });
     return uid;
@@ -360,6 +364,9 @@ function dropRemovedUrl(it) {
     URL.revokeObjectURL(it.removedUrl);
     it.removedUrl = null;
   }
+  it.removedBlob = null;
+  it.removedIdx = null;
+  it.originalShown = true;
 }
 
 function renderTile(it) {
@@ -378,7 +385,7 @@ function renderTile(it) {
     const media = showRemoved
       ? `<div class="checker"></div><img src="${removedSrc(it)}" alt="" />`
       : m.type === "video"
-        ? `<img src="" alt="" style="background:var(--surface-2)" />`
+        ? `<img src="data:," alt="" style="background:var(--surface-2)" />`
         : `<img src="${esc(m.url)}" alt="" loading="lazy" decoding="async" />`;
 
     const over = isBusy ? `
@@ -430,15 +437,21 @@ function openStudio(uid) {
 
 function closeStudio() {
   studioUid = null;
+  if (compareCleanup) { compareCleanup(); compareCleanup = null; }
   viewStudio.hidden = true;
   viewList.hidden = false;
   viewStudio.innerHTML = "";
   render();
 }
 
+let compareCleanup = null;
+
 function renderStudio() {
   const it = items.get(studioUid);
   if (!it) return closeStudio();
+
+  // Lepas listener dari render sebelumnya; tanpa ini menumpuk tiap prev/next.
+  if (compareCleanup) { compareCleanup(); compareCleanup = null; }
 
   const m = currentMedia(it);
   const showRemoved = it.removedBlob && !it.originalShown;
@@ -553,6 +566,7 @@ function wireCompare(frame) {
   if (baseImg.complete) syncLayer();
   else baseImg.addEventListener("load", syncLayer, { once: true });
   window.addEventListener("resize", syncLayer);
+  compareCleanup = () => window.removeEventListener("resize", syncLayer);
 
   const set = (pct) => {
     const p = Math.max(0, Math.min(100, pct));
@@ -595,6 +609,12 @@ function wireCompare(frame) {
   frame.addEventListener("pointercancel", end);
   window.addEventListener("pointerup", end);
 
+  const prevCleanup = compareCleanup;
+  compareCleanup = () => {
+    prevCleanup?.();
+    window.removeEventListener("pointerup", end);
+  };
+
   frame.addEventListener("keydown", (e) => {
     const now = Number(frame.getAttribute("aria-valuenow")) || 50;
     if (e.key === "ArrowLeft") { set(now - 4); e.preventDefault(); }
@@ -629,7 +649,7 @@ document.addEventListener("click", (e) => {
     case "prev": return switchAsset(it, -1);
     case "next": return switchAsset(it, +1);
     case "pick":
-      if (it) { it.idx = Number(btn.dataset.idx); render(); }
+      if (it) { setIdx(it, Number(btn.dataset.idx)); render(); }
       return;
   }
 });
@@ -651,14 +671,16 @@ function retryItem(it) {
   resolveAll([url]);
 }
 
+function setIdx(it, n) {
+  if (n === it.idx) return;
+  it.idx = n;
+  // Hasil cut-out hanya sah untuk gambar asalnya; kalau pindah aset, buang.
+  if (it.removedBlob && it.removedIdx !== n) dropRemovedUrl(it);
+}
+
 function switchAsset(it, dir) {
   if (!it || !it.media.length) return;
-  it.idx = (it.idx + dir + it.media.length) % it.media.length;
-  if (it.removedBlob && it.media[it.idx].type !== "image") {
-    dropRemovedUrl(it);
-    it.removedBlob = null;
-    it.originalShown = true;
-  }
+  setIdx(it, (it.idx + dir + it.media.length) % it.media.length);
   render();
 }
 
@@ -929,6 +951,7 @@ async function removeBackground(it) {
     if (!blob || blob.size < 200) throw new Error("Hasil kosong — coba mode AI.");
 
     it.removedBlob = blob;
+    it.removedIdx = it.idx;
     it.originalShown = false;
     it.state = "ready";
     it.progress = null;
@@ -1027,6 +1050,11 @@ async function quickRemove(blob) {
 }
 
 /* ---------------------------------------------------------------- init */
+
+// batas batch ditentukan server supaya UI dan server tidak pernah beda
+fetch("/api/health").then((r) => r.json()).then((d) => {
+  if (Number.isInteger(d.maxBatch) && d.maxBatch > 0) maxBatch = d.maxBatch;
+}).catch(() => {});
 
 // pulihkan tampilan yang terakhir dipakai
 for (const b of $("#view-mode").children) {

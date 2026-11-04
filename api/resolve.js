@@ -6,7 +6,7 @@
 
 "use strict";
 
-const { MAX_BATCH, resolvePin, rateLimited } = require("../lib/core");
+const { MAX_BATCH, resolvePin, rateLimited, clientIp } = require("../lib/core");
 
 function readBody(req, limit = 64 * 1024) {
   return new Promise((resolve, reject) => {
@@ -32,13 +32,7 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  const ip = (
-    (req.headers["x-forwarded-for"] || "").toString().split(",")[0].trim() ||
-    req.socket?.remoteAddress ||
-    "?"
-  );
-
-  if (rateLimited(ip)) {
+  if (rateLimited(clientIp(req))) {
     res.status(429).json({ error: "Terlalu banyak permintaan, tunggu sebentar." });
     return;
   }
@@ -52,7 +46,7 @@ module.exports = async function handler(req, res) {
   }
 
   const urls = Array.isArray(body.urls) ? body.urls : [body.url];
-  const clean = urls.map(String).filter(Boolean).slice(0, MAX_BATCH);
+  const clean = urls.filter((x) => typeof x === "string" && x.trim()).map((x) => x.trim()).slice(0, MAX_BATCH);
   if (!clean.length) {
     res.status(400).json({ error: "Tidak ada URL" });
     return;
