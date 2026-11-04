@@ -758,13 +758,12 @@ async function aiRemove(blob, onProgress) {
   sctx.drawImage(mcv, 0, 0, bmp.width, bmp.height);
   const alpha = sctx.getImageData(0, 0, bmp.width, bmp.height).data;
 
-  // Mask dari model hanya 1024px, jadi tepinya kasar. Guided filter memakai
-  // gambar asli resolusi penuh sebagai pemandu, sehingga tepi mengikuti
-  // garis nyata di gambar (±0,5 detik, sekali jalan).
-  const smooth = guidedAlpha(imgData.data, alpha, bmp.width, bmp.height);
-
+  // Mask dari model sudah punya tepi lembut sendiri. guidedAlpha di sini
+  // justru merusak: ia penghalus, jadi bintik alpha rendah di latar ikut
+  // disebar jadi kabut (haze 7,1% -> 18,8%). Buang ekor alpha rendah saja.
   for (let i = 0; i < bmp.width * bmp.height; i++) {
-    imgData.data[i * 4 + 3] = smooth[i];
+    const a = alpha[i * 4 + 3];
+    imgData.data[i * 4 + 3] = a < 26 ? 0 : a;
   }
 
   // Warna latar masih "menembus" di piksel tepi yang setengah transparan —
@@ -819,7 +818,10 @@ function defringe(data, W, H) {
 }
 
 /**
- * Guided filter (He et al. 2010) untuk mempertajam alpha mengikuti tepi gambar.
+ * Guided filter (He et al. 2010) — penghalus edge-aware, bukan penajam.
+ * Dipakai mode Cepat untuk menghilangkan gerigi alpha biner dari flood-fill.
+ * Jangan dipakai di jalur AI: mask model sudah bertepi lembut, dan filter ini
+ * justru menyebarkan bintik alpha rendah di latar jadi kabut.
  * Semua array satu kanal; box filter lewat integral image supaya O(n).
  */
 function guidedAlpha(rgba, alphaRgba, W, H) {
@@ -1011,9 +1013,9 @@ async function quickRemove(blob) {
 
   ctx.putImageData(imgData, 0, 0);
 
-  // Flood-fill menghasilkan alpha biner, jadi tepinya bergerigi. Guided filter
-  // mempertajamnya mengikuti garis nyata di gambar; defringe membuang warna
-  // latar yang menembus tepi. Sama seperti jalur AI, hanya lebih murah.
+  // Flood-fill menghasilkan alpha biner, jadi tepinya bergerigi. Di sini guided
+  // filter memang berguna: ia menghaluskan gerigi itu mengikuti garis nyata di
+  // gambar. defringe membuang warna latar yang menembus tepi.
   const smooth = guidedAlpha(imgData.data, imgData.data, w, h);
   for (let i = 0; i < w * h; i++) {
     imgData.data[i * 4 + 3] = smooth[i];
